@@ -6,16 +6,39 @@ import com.kshrd.jpajwtdemo.repo.RoleRepository;
 import com.kshrd.jpajwtdemo.repo.UserRepository;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 @Service @AllArgsConstructor @Transactional @Slf4j
-public class UserServiceImpl implements UserService {
+public class UserServiceImpl implements UserService, UserDetailsService {
 
     private final UserRepository userRepo;
     private final RoleRepository roleRepo;
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        User user = userRepo.findByUsername(username);
+        if(user == null){
+            log.error("User not found in the database");
+        }else{
+            log.info("User found in database");
+        }
+
+        Collection<SimpleGrantedAuthority> authorities = new ArrayList<>();
+
+        user.getRoles().forEach(role -> {
+            authorities.add(new SimpleGrantedAuthority(role.getName()));
+        });
+        return new org.springframework.security.core.userdetails.User(user.getName(), user.getPassword(), authorities);
+    }
 
     @Override
     public User saveUser(User user) {
@@ -48,4 +71,6 @@ public class UserServiceImpl implements UserService {
         log.info("Fetching all users");
         return userRepo.findAll();
     }
+
+
 }

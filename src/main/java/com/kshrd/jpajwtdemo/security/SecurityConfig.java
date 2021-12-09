@@ -1,11 +1,13 @@
 package com.kshrd.jpajwtdemo.security;
 
 import com.kshrd.jpajwtdemo.filter.CustomAuthenticationFilter;
+import com.kshrd.jpajwtdemo.filter.CustomAuthorizationFilter;
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -14,8 +16,12 @@ import org.springframework.security.config.annotation.web.configuration.WebSecur
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-@Configuration @EnableWebSecurity @RequiredArgsConstructor
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     private final UserDetailsService userDetailsService;
@@ -29,12 +35,20 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
-        super.configure(http);
+        CustomAuthenticationFilter authenticationFilter = new CustomAuthenticationFilter(authenticationManagerBean());
+        authenticationFilter.setFilterProcessesUrl("/api/login");
         http.csrf().disable();
         http.sessionManagement().sessionCreationPolicy((SessionCreationPolicy.STATELESS));
-        http.authorizeHttpRequests().anyRequest().permitAll();
-        http.addFilter(new CustomAuthenticationFilter(authenticationManagerBean()));
-
+        http.authorizeHttpRequests()
+                .antMatchers("/api/login/**").permitAll()
+                .antMatchers("/api/token/refresh/**").permitAll()
+                .antMatchers(HttpMethod.GET,"/api/v1/user/**").hasAnyAuthority("ROLE_USER")
+                .antMatchers(HttpMethod.POST,"/api/v1/user/save/**").hasAnyAuthority("ROLE_ADMIN")
+                .and()
+                .authorizeHttpRequests().anyRequest().authenticated()
+                .and()
+                .addFilter(authenticationFilter)
+                .addFilterBefore(new CustomAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class);
     }
 
     @Bean
